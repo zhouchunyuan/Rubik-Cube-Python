@@ -141,25 +141,16 @@ def colorByRGB2(*args):
     blue = float(max(blue, 1))
 
 
-    if h >= 4 and h < 15 and s > 90 and s < 190 and v > 10 and v < 130:
+    if h > 0 and h < 20 and s > 50 and s < 190 and v > 10 and v < 130:
         return 'red'
     elif h > 4 and h < 15 and s > 100 and s < 200 and v > 140:
         return 'orange'
-    elif h > 25 and h < 40 :#and s > 100 and s < 140 and v > 150 and v < 190:
+    elif h > 25 and h < 50 :#and s > 100 and s < 140 and v > 150 and v < 190:
         return 'yellow'
     elif h > 50 and h < 70 :#and s > 80 and s < 190 and v > 80 and v < 180:
         return 'green'
-    elif h >= 40 and h < 50 :
-        if s > 100 and v < 180:
-            return 'green'
-        else:
-            return 'yellow'
-##    elif h > 10 and h < 110 and s > 120 and s < 255 and v > 30 and v < 190:
-##        return 'blue'
-##    elif h > 20 and h < 80 :#and s > 1 and s < 60 and v > 100 and v < 170:
-##        return 'white'
     elif h > 75 and h < 110 :#and s > 1 and s < 60 and v > 100 and v < 170:
-        if s > 1 and s < 100 and v > 100 and v < 255:
+        if s > 1 and s < 60 and v > 100 and v < 255:
             return 'white'
         else:
             return 'blue'
