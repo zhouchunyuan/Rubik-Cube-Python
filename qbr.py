@@ -1,12 +1,14 @@
 # qbr.py
 # Chris Barker
 # CMU S13 15-112 Term Project
-
+# modified by Chunyuan March 2017
 
 from app import App
 import Tkinter
 import screenGrabber
 from cube import Cube
+
+import debugtools
 
 class Cubr(App):
 
@@ -124,7 +126,22 @@ class Cubr(App):
 
         if event.keysym == 'space': self.cube.solve()
         if event.keysym == 'c': self.fromCamera()
+        #press 'p' to print state
+        if event.keysym == 'p':
+            debugtools.show_state(self.cube.state.state)
 
+            for layer in self.cube.state.state:
+                for line in layer:
+                    print line
+                print''
+            
+            
+        # press 'i' to show the color map
+        # for all faces
+        if event.keysym == 'i':
+            debugtools.show_all_faces(self.cube.state.state)
+
+            
     def keyReleased(self, event):
         if event.keysym in ['Left', 'Right', 'Down', 'Up']:
             # stopping rotation

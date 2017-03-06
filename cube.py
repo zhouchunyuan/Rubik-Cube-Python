@@ -1,6 +1,7 @@
 # cube.py
 # Chris Barker
 # CMU S13 15-112 Term Project
+# modified by Chunyuan March 2017
 
 from Tkinter import *
 from geometry import *
@@ -149,6 +150,8 @@ rotates to the next face so that your cube will be interpreted accurately.',
     
     def __init__(self, canvas, controlPane, app, mode='solved'):
         Cube.setFaceColors()
+
+        #print self.faceColors
 
         self.state = CubeState(mode)
         self.faces = { }
@@ -650,6 +653,7 @@ rotates to the next face so that your cube will be interpreted accurately.',
                         pieceCenter = pieceCenter + sin(theta) * pieceRotation
 
                     faceColors = Cube.faceColors[pieceID]
+                    #print pieceID,faceColors
                     for direc, color in zip(sod, faceColors):
                         axes = ()
                         faceCenter = pieceCenter + (direc / 2)
@@ -812,9 +816,24 @@ rotates to the next face so that your cube will be interpreted accurately.',
         self.redraw()
 
     def setConfig(self, config):
+        #print config.events
         try:
             self.state = CubeState('barebones')
 
+            #colorOrder is used to contain the orientation info
+            # ['0','1','2'] => 201
+            # in this example, '2' is at the 2-index position
+            #  use int(colorOrder[2]+colorOrder[1]+colorOrder[0]
+            #  to create cube states
+            colorOrder = [[[['','',''],['','',''],['','','']],
+                           [['','',''],['','',''],['','','']],
+                           [['','',''],['','',''],['','','']]],
+                          [[['','',''],['','',''],['','','']],
+                           [['','',''],['','',''],['','','']],
+                           [['','',''],['','',''],['','','']]],
+                          [[['','',''],['','',''],['','','']],
+                           [['','',''],['','',''],['','','']],
+                           [['','',''],['','',''],['','','']]]]
             if self.debug:
                 print self.state
 
@@ -824,8 +843,8 @@ rotates to the next face so that your cube will be interpreted accurately.',
             def faceToAxis(face):
                 if self.debug:
                     print face
-
-                center = face[1][1]
+                #decide direction according to the center piece
+                center = face[1][1]   
                 axis = [vec for vec in Cube.directions if 
                         Cube.directions[vec].lower() == center.lower()][0]
                 return axis
@@ -847,12 +866,13 @@ rotates to the next face so that your cube will be interpreted accurately.',
 
                 return (up, down, left, right)
 
+
             timesTouched = [[[0,0,0],[0,0,0],[0,0,0]],[[0,0,0],[0,0,0],[0,0,0]],[[0,0,0],[0,0,0],[0,0,0]]]
             
             for faceInfo in config:
-
                 axis = faceToAxis(faceInfo.currentFace)
                 prevAxis = nextAxis = None
+
                 if faceInfo.prevFace:
                     prevAxis = faceToAxis(faceInfo.prevFace)
                 if faceInfo.nextFace:
@@ -881,24 +901,77 @@ rotates to the next face so that your cube will be interpreted accurately.',
                     print 'down:', down, Cube.directions[down]
                     print 'left:', left, Cube.directions[left]
                     print 'right:', right, Cube.directions[right]
-                
+                    
+                #print '----',faceInfo.currentFace[1][1],'----'
+
                 for row in xrange(3):
                     for col in xrange(3):
                         pos = axis
                         pos = pos + (down * (row - 1))
                         pos = pos + (right * (col - 1))
-
+                        #pos is the absolute coordinate
+                        #1st corner is (blue,orange,white)
                         (x, y, z) = pos.components
                         (x, y, z) = (int(x+1), int(y+1), int(z+1))
-                        if self.debug:
-                            print 'x,y,z', x, y, z,
-                            print 'pos=', pos
 
                         timesTouched[z][y][x] += 1
 
                         cell = self.state.state[z][y][x]
                         if type(cell) == list:
                             cell.append((faceInfo.currentFace[row][col], axis))
+
+                        ####### modified algorism for orientation ##############    
+                        currentColor = faceInfo.currentFace[row][col]
+                        currentColorCode = [vec for vec,color in Cube.directions.items() if color == currentColor]
+                        currentColorCode = currentColorCode[0]
+                        
+                        if currentColorCode // Vector(0,0,1) :
+                            orderCode = 2
+                        elif currentColorCode // Vector(0,1,0) :
+                            orderCode = 1
+                        elif currentColorCode // Vector(1,0,0) :
+                            orderCode = 0
+                            
+                        if axis // Vector(0,0,1):# currently in Z direction,
+                            positionCode = 2 # Z direction [2]
+                        elif axis // Vector(0,1,0):# currently in Y direction
+                            positionCode = 1 # Y direction [1]
+                        elif axis // Vector(1,0,0):# currently in X direction
+                            positionCode = 0 # X direction [0]
+
+                        colorOrder[z][y][x][orderCode ] = str(positionCode)
+                        #########################################################
+                        
+                        #print currentColor, 'order',orderCode, 'pos',positionCode,'=',colorOrder[z][y][x]
+                        if self.debug:
+                            print 'x,y,z', x, y, z,
+                            print 'pos=', pos,self.state.state[z][y][x]
+                            print orderCode, positionCode
+                            
+            # fill vacant positions for colorOrder
+            # e.g. ['2','','1'] => ['2','0','1']
+            for z in xrange(3):
+                for y in xrange(3):
+                    for x in xrange(3):
+                        notAdded = set(['0','1','2'])
+                        for c in colorOrder[z][y][x]:
+                            if c in notAdded:
+                                notAdded.discard(c)
+                        while len(notAdded) > 0:
+                            for i in xrange(3):
+                                if colorOrder[z][y][x][i]=='':
+                                    colorOrder[z][y][x][i]= notAdded.pop()
+
+##            for z in xrange(3):
+##                for y in xrange(3):
+##                    for x in xrange(3):
+##                        print x,y,z
+##                        orientation = colorOrder[z][y][x][2]+colorOrder[z][y][x][1]+colorOrder[z][y][x][0]
+##                        #using "{:<2}".format(str(pieceID)) to pad
+##                        print "{:<3}".format(str(orientation)),
+##                    print ''
+##                print ''
+                    
 
             if self.debug:
                 print 'state=', self.state
@@ -915,7 +988,6 @@ rotates to the next face so that your cube will be interpreted accurately.',
             yRange = range(3)[::reverseY]
             xRange = range(3)[::reverseX]
 
-
             for z in zRange:
                 for y in yRange:
                     for x in xRange:
@@ -923,55 +995,64 @@ rotates to the next face so that your cube will be interpreted accurately.',
                         cell = self.state.state[z][y][x]
 
                         if type(cell) == list:
+
                             pieceId = -1
                             colors = set()
                             for i in cell:
                                 colors.add(i[0])
+
                             for key in Cube.faceColors:
                                 if set(Cube.faceColors[key]) == colors:
                                     pieceId = key
                                     break
                             
-                            if pieceId >= 0:
-                                desiredColorOrder = Cube.faceColors[pieceId]
-                                currentOrder = [ ]
-                                ori = 0
-                                notAdded = set([0,1,2])
-
-                                cell.sort(lambda a,b: cmp(desiredColorOrder.index(a[0]),
-                                                          desiredColorOrder.index(b[0])))
-
-                                for i in cell:
-                                    ori *= 10
-                                    if i[1] // Vector(0,0,1):
-                                        ori += 2
-                                        notAdded.discard(2)
-                                    elif i[1] // Vector(0,1,0):
-                                        ori += 1
-                                        notAdded.discard(1)
-                                    elif i[1] // Vector(1,0,0):
-                                        ori += 0
-                                        notAdded.discard(0)
-
-                                while len(notAdded) > 0:
-                                    ori *= 10
-                                    ori += notAdded.pop()
-
-                                orientationKey = ori
-
+                            if pieceId >= 0: pass
+##                                desiredColorOrder = Cube.faceColors[pieceId]
+##
+##                                currentOrder = [ ]
+##                                ori = 0
+##                                notAdded = set([0,1,2])
+##
+##                                #print [c[0] for c in cell]
+##
+##                                cell.sort(lambda a,b: cmp(desiredColorOrder.index(a[0]),
+##                                                          desiredColorOrder.index(b[0])))
+##                                #print [c[0] for c in cell]
+##                                #pirnt ''
+##
+##                                for i in cell:
+##                                    ori *= 10
+##                                    if i[1] // Vector(0,0,1):
+##                                        ori += 2
+##                                        notAdded.discard(2)
+##                                    elif i[1] // Vector(0,1,0):
+##                                        ori += 1
+##                                        notAdded.discard(1)
+##                                    elif i[1] // Vector(1,0,0):
+##                                        ori += 0
+##                                        notAdded.discard(0)
+##
+##                                while len(notAdded) > 0:
+##                                    ori *= 10
+##                                    ori += notAdded.pop()
+##
+##                                orientationKey = ori
+                                #print pieceId,[(c[0],c[1]) for c in cell],'==',ori
                             else:
-                                
                                 raise ValueError('Invalid Cube')
 
                             if pieceId in (5, 11, 13, 14, 15, 17, 23):
                                 raise ValueError('Invalid Cube') # Center piece
 
-                            desired = Cube.faceColors[CubeState.solvedState[z][y][x][0]]
-
-                            if self.debug:
-                                print 'The piece with colors %s is at the position of %s' % (colors, desired)
-                                print 'setting (%d,%d,%d) to (%s, %s)' % (z,y,x,pieceId,orientationKey)
-
+##                            desired = Cube.faceColors[CubeState.solvedState[z][y][x][0]]
+##
+##                            if self.debug:
+##                                print 'The piece with colors %s is at the position of %s' % (colors, desired)
+##                                print 'setting (%d,%d,%d) to (%s, %s)' % (z,y,x,pieceId,orientationKey)
+                                
+                            oriStr = colorOrder[z][y][x]
+                            orientationKey = int(oriStr[2]+oriStr[1]+oriStr[0])
+                            
                             self.state.state[z][y][x] = (pieceId, orientationKey)
         except:
             self.updateMessage('Unable to read camera input.')
@@ -1218,14 +1299,19 @@ Non-graphical; meant for algorithmic purposes."""
 
         if type(axis) == str:
             axis = CubeState.movementKeys[axis]
-
+  
         rotationIndcs = [ ]
+        # find out the affected 9 blocks
+        # put it into rotationIndcs
         for x in xrange(self.size):
             for y in xrange(self.size):
                 for z in xrange(self.size):
                     pos = Vector(x-1,y-1,z-1)
+                    #<0,1,0> == <1,1,1> returns [False,True,False]
+                    #and the total bool value is True if any 'True' inside the list
                     if pos**axis > 0 and pos == axis:
                         rotationIndcs.append((x,y,z))
+                      
 
         oldValues = { }
         for i in rotationIndcs:
@@ -1234,9 +1320,12 @@ Non-graphical; meant for algorithmic purposes."""
         rot = Struct()
         rot.rotationAxis = axis
         rot.rotatingValues =[val[0] for val in oldValues.values()]
+        # totatingValues are only block indices from 1 to 27
         rot.rotationDirection = isNeg
         rot.oldValues = oldValues
+        # oldValues is tuple like ((0, 2, 0): (7, 210) ... )
         rot.rotationIndcs = rotationIndcs
+        # rotationIndcs is the (0,2,0)... part
         return rot
 
     def rotate(self, r):
@@ -1250,11 +1339,19 @@ Non-graphical; meant for algorithmic purposes."""
 
         for idx in rotationIndcs:
             pos = Vector(idx[0]-1, idx[1]-1, idx[2]-1)
+            #pos > axis is the project from pos to axis
             posn = pos - (pos > axis)
+            #posn is the position vector projection on
+            #the rotated surface
             newn = axis * posn
+            #A*B=A x B. The above is vector cross multiply
+            #which means posn rotate around axis clockwise
+
             if isNeg:
                 newn = newn * -1.
             new = newn + (pos > axis)
+            # new is the rotated vector, projected back to
+            # the rotated surface
 
             # Alter the rotationkey
             (oldId, oldKey) = oldValues[idx]
