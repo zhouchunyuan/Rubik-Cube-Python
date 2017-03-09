@@ -220,7 +220,7 @@ class DemoCube(object):
 
         #added for indicating box
         #flashing
-        #self.waiting = False
+        self.waitingColor = False # wait for changing color
         self.flashLight = False
 
     @staticmethod
@@ -707,27 +707,24 @@ def timer(data):
 ##        # to give waiting signal to cube
 ##        # to flash the indicating box
 ##        data.cube.waiting = data.waiting
-        #if data.cube.faceIndex <5 :
-        data.showingSelector = False
-
-        data.stream.logFace(colors)
-        data.numLogged += 1
         data.cube.faceIndex += 1
-
-        if data.numLogged in (1, 5):
-            data.stream.logTurn('up')
-        else:
-            data.stream.logTurn('right')
+        if not data.cube.waitingColor:
+            data.showingSelector = False
+            data.stream.logFace(colors)
+            data.numLogged += 1
+            if data.numLogged in (1, 5):
+                data.stream.logTurn('up')
+            else:
+                data.stream.logTurn('right')
             
-    if data.numLogged == 6:
-        
-        demoCube = data.cube
-        doit(demoCube)
-        data.cube.faceIndex = 0
-        
-    elif data.numLogged > 6:
-        
-        data.cube.faceIndex = data.cube.faceIndex % 6
+        if data.numLogged == 6:
+            
+            demoCube = data.cube
+            doit(demoCube)
+            data.cube.waitingColor = True
+            
+        if data.cube.waitingColor:
+            data.cube.faceIndex = data.cube.faceIndex % 6
    
     if ch == 27 : # Escape key
         
