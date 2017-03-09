@@ -218,6 +218,11 @@ class DemoCube(object):
         self.transitionSpeed = 1
         self.camera = Camera(Vector(2, -4, 10), Vector(0,0,0), pi/5, self.dim)
 
+        #added for indicating box
+        #flashing
+        #self.waiting = False
+        self.flashLight = False
+
     @staticmethod
     def faceInfo(i):
         faceIndex = i / 9
@@ -232,15 +237,22 @@ class DemoCube(object):
     def adjustCamera(self):
         destination = (DemoCube.directions[self.faceIndex]) ^ 1
         current = (self.camera.view) ^ 1
-        if destination ** current < 0.6:
-            currentPos = self.camera.pos
-            destinationPos = self.camera.origin + destination * (currentPos.mag)
-            deltaY = destinationPos ** self.camera.up
-            deltaX = destinationPos ** self.camera.right
-            deltaX *= 0.1
-            deltaY *= 0.1
-            self.camera.rotate((deltaX, deltaY))
+        
+        delta = destination ** current
+        if delta >0.9 :
+            factor = 40# 180 dgree turn need large movement at first
+        else:
+            factor = (delta+1)*3.0+1 # ratation speed
+            
+        currentPos = self.camera.pos
+        destinationPos = self.camera.origin + destination * (currentPos.mag)
+        deltaY = destinationPos ** self.camera.up
+        deltaX = destinationPos ** self.camera.right
+        deltaX *= 0.1*factor
+        deltaY *= 0.1*factor
+        self.camera.rotate((deltaX, deltaY))
 
+            
     def faceClicked(self, x, y):
         for i in xrange(len(self.colors)):
             (center, norm, up, right) = self.faceInfo(i)
@@ -280,6 +292,7 @@ class DemoCube(object):
                 cv2.fillConvexPoly(np.asarray(vis), 
                     points, colorTuple(self.colors[i]), lineType=4, shift=0)
 
+
         for i in xrange(len(self.colors)):
             (center, norm, up, right) = self.faceInfo(i)
             if norm ** (center - self.camera.pos) < 0:
@@ -296,6 +309,41 @@ class DemoCube(object):
 #                    cv.Line(cv.fromarray(vis), corners[j], corners[k], (0,0,0))
                     cv2.line(np.asarray(vis), corners[j], corners[k], (0,0,0))
 
+        ############# plot color map ###########
+        w = 20
+        xoffset = 20
+        yoffset = 20
+        for i in xrange(len(self.colors)):
+            # 2 layers, each layer contains 27 blocks
+            # inverse x, so use 3-i
+            # gap 30 between each 2 9-block
+            x = 2-i%3+(i/3)*3 # inverse x for each line
+            xgap = (x%27)/9*w*3 + (x%3)*5 + ((x%27)/9)*30
+
+            ####   3x3 height  9 for each    gap 30
+            ygap = i/27*w*3 + ((i%9)/3)*5 + (i/27)*30
+            x0 = w*(x%3)+xoffset + xgap
+            x1 = x0+w
+            y0 = w*((i%9)/3)+self.height+yoffset+ygap
+            y1 = y0+w
+            cv2.rectangle(np.asarray(vis),(x0,y0),(x1,y1),colorTuple(self.colors[i]),-1)
+        ##### indicate the current face ##########
+        x0 = xoffset + self.faceIndex%3 * (w*3+30)
+        y0 = yoffset + self.height + self.faceIndex/3 * (w*3+30)
+        x1 = x0 +w*3+10
+        y1 = y0 +w*3+10
+
+        #test if camera is stable
+        destination = (DemoCube.directions[self.faceIndex]) ^ 1
+        current = (self.camera.view) ^ 1
+        if destination ** current < -0.8:
+            self.flashLight = True
+        else:
+            self.flashLight = not self.flashLight
+        cv2.rectangle(np.asarray(vis),(x0,y0),(x1,y1),(0,255*self.flashLight,0))
+##        if self.waiting :
+##            cv2.rectangle(np.asarray(vis),(x0,y0),(x1,y1),(0,255,255))
+        ##### ######################### ##########
     def setColors(self, colors, faceIndex):
         if faceIndex > 5:
             return
@@ -551,8 +599,11 @@ def timer(data):
         #print myrgb,myhsv,avghsv
         
         color = colorByRGB2(avgrgb, h,s,v)#avghsv)
-        colors.append(color)
 
+        #it is both ok to use 'green' or to use(0,255,0)
+        #colors.append(color)
+        colors.append(avgrgb)
+        
         cv2.rectangle(vis, (x0, y0), (x1, y1), (255, 255, 255))
         cv2.circle(vis, ((x0+x1) / 2, (y0 + y1) / 2), 10, rgb_hsv, -1)
 
@@ -639,21 +690,54 @@ def timer(data):
     ##############################
 
     if ch == 32: # Spacebar
+##        #if data.cube.faceIndex <5 :
+##        data.showingSelector = False
+##        if data.waiting:
+##            data.cube.faceIndex += 1
+##        else:
+##            data.stream.logFace(colors)
+##            data.numLogged += 1
+##        data.waiting = not data.waiting
+##
+##        if data.numLogged in (1, 5):
+##            data.stream.logTurn('up')
+##        else:
+##            data.stream.logTurn('right')
+##            
+##        # to give waiting signal to cube
+##        # to flash the indicating box
+##        data.cube.waiting = data.waiting
+        #if data.cube.faceIndex <5 :
         data.showingSelector = False
-        if data.waiting:
-            data.cube.faceIndex += 1
-        else:
-            data.stream.logFace(colors)
-            data.numLogged += 1
-        data.waiting = not data.waiting
+
+        data.stream.logFace(colors)
+        data.numLogged += 1
+        data.cube.faceIndex += 1
 
         if data.numLogged in (1, 5):
             data.stream.logTurn('up')
         else:
             data.stream.logTurn('right')
-
-    if ch == 27 or data.cube.faceIndex == 6: # Escape key
+            
+    if data.numLogged == 6:
+        
+        demoCube = data.cube
+        doit(demoCube)
+        data.cube.faceIndex = 0
+        
+    elif data.numLogged > 6:
+        
+        data.cube.faceIndex = data.cube.faceIndex % 6
+   
+    if ch == 27 : # Escape key
+        
+        data.numLogged = 6
+        data.cube.faceIndex = 6
+        
         data.callback(data.cube.toStream())
+        #obj = data.cube.toStream()
+        #print obj.events
+        
         data.cam.release()
         # I did not write this code:
         ##############################
@@ -662,6 +746,180 @@ def timer(data):
         return False
 
     return True
+
+def doit(demoCube):
+
+           
+    class centerColor():
+        def __init__(self, s):
+            self.colorName = s
+            self.color = colorTuple(s)
+            self.pureVector = Vector(self.color[0],self.color[1],self.color[2])# color expressed in vector
+            self.faceIndex = -1
+            self.realVector = self.pureVector# color expressed in vector
+            self.norm = Vector(0,0,0)
+            
+        def getPosition(self):
+            if self.faceIndex != -1:
+                return 4 + self.faceIndex*9
+
+        def setFaceInfoByNorm(self,config):
+            for i,d in enumerate(DemoCube.directions):
+                if d.isEqual(self.norm):
+                    self.faceIndex = i
+                    break
+            for i,faceInfo in enumerate(config) :
+                if self.faceIndex == i:
+                    color = faceInfo.currentFace[1][1]
+                    (r,g,b) = colorTuple(color)
+                    self.realVector = Vector(r,g,b)
+                    break
+            
+        def findMostPossibleCenterPosition(self,config):
+            # config is from Stream() class
+            # the colors are in the events string
+            # but it also has 'data' in each faceInfo
+            maxCorr = 0
+            for i,faceInfo in enumerate(config) :
+                color = faceInfo.currentFace[1][1]
+
+                #the color can be names
+                (r,g,b) = colorTuple(color)
+                vec = Vector(r,g,b)
+                #d = abs(2 - float(r+b)/g)
+                #print i,(r,g,b)
+                corr = centerColor.corrRgb(vec,self.pureVector)
+                if maxCorr < corr:
+                    maxCorr = corr
+                    self.faceIndex = i
+                    self.realVector = vec
+                    self.norm = DemoCube.directions[i]
+
+                
+        @staticmethod        
+        def most9similarColors(config):
+            cells = [] # [(index,color,correlation)]
+            for i,color in enumerate(demoCube.colors) :
+                (r,g,b) = colorTuple(color)
+                vec = Vector(r,g,b)
+                corr = 0 #centerColor.corr(vec,self.realVector)
+                cells.append([i,vec,corr])
+
+                
+            used = set()
+            for FACE in FACES:# first draw centers
+                demoCube.setColor(FACE[0].getPosition(),FACE[0].colorName)
+                used.add(FACE[0].getPosition())
+                
+            for FACE in FACES:
+                for i,cell in enumerate(cells):
+                    vec = cell[1]
+                    corr = centerColor.corrRgb( vec,FACE[0].realVector )
+                    cells[i][2] = corr
+                cells.sort(key = lambda cell : cell[2], reverse=True)
+                i=0
+                for cell in cells:
+                    if cell[0] not in used:
+                        demoCube.setColor( cell[0],FACE[0].colorName)
+                        used.add(cell[0])
+                        i +=1
+                    if i== 8 : break
+
+        # correlation between 2 vectors
+        # equals to cos(angle)=<a.b>/|a|.|b|        
+        @staticmethod
+        def corrRgb(a,b):
+            if type(a)==Vector and type(b)==Vector :
+                return a ** b / (a.mag * b.mag)
+            else:
+                raise Exception('all vectors needed!')
+            
+        @staticmethod
+        def rgb2hsv(r,g,b):
+            rgb = np.uint8([[(r,g,b)]])
+            hsv = cv2.cvtColor(rgb,cv2.COLOR_BGR2HSV)
+            [[[h,s,v]]]=hsv
+            return (h,s,v)
+
+        # correlation between 2 HSV vectors
+        # equals to cos(angle)=<a.b>/|a|.|b|        
+        @staticmethod
+        def corrHsv(a,b):
+            if type(a)==Vector and type(b)==Vector :
+                (x1,y1,z1) = centerColor.rgb2hsv(a.z,a.y,a.x)
+                (x2,y2,z2) = centerColor.rgb2hsv(b.z,b.y,b.x)
+                A = Vector(x1,y1,z1)
+                B = Vector(x2,y2,z2)
+                return A ** B / (A.mag * B.mag)
+            else:
+                raise Exception('all vectors needed!')
+            
+        # correlation between 2 vectors in 4-dimention
+        @staticmethod
+        def corr1(a,b):
+            if type(a)==Vector and type(b)==Vector :
+                A = a.x*b.x + a.y*b.y + a.z*b.z + a.mag*b.mag
+                B = (a.x*a.x + a.x*a.x + a.z*a.z + a.mag*a.mag)*(b.x*b.x + b.y*b.y + b.z*b.z + b.mag*b.mag)
+                B = B**0.5
+                return A/B
+            else:
+                raise Exception('all vectors needed!')
+
+
+            
+            
+    WHITE   = centerColor('white')
+    GREEN   = centerColor('green')
+    RED     = centerColor('red')
+    ORANGE  = centerColor('orange')
+    BLUE    = centerColor('blue')
+    YELLOW  = centerColor('yellow')
+
+    # if we want to use objects in list, the elements must
+    # be in []. Does not work if:
+    # FACES = [WHITE,RED,YELLOW,BLUE,GREEN,ORANGE]
+    FACES = [[WHITE],[GREEN],[YELLOW],[BLUE],[RED],[ORANGE]]
+    
+    config = demoCube.toStream()
+
+    WHITE.findMostPossibleCenterPosition(config)
+    GREEN.findMostPossibleCenterPosition(config)
+   
+    if ( WHITE.faceIndex == GREEN.faceIndex):
+        print 'green is too similar to white'
+    if ( WHITE.norm // GREEN.norm):
+        print 'White face is parallel to green face, which is wrong!'
+    else:
+        # the cross multiply of face directions
+        # white.face x grean.face => red.face
+        
+        RED.norm =  WHITE.norm * GREEN.norm
+        RED.setFaceInfoByNorm(config)
+
+        #print RED.norm, RED.faceIndex
+        
+        ORANGE.norm = - RED.norm
+        ORANGE.setFaceInfoByNorm(config)
+
+        #print ORANGE.norm, ORANGE.faceIndex
+        
+        BLUE.norm = -GREEN.norm
+        BLUE.setFaceInfoByNorm(config)
+        
+        YELLOW.norm = -WHITE.norm
+        YELLOW.setFaceInfoByNorm(config)
+        #print 'red' ,RED.getPosition(), RED.color
+        #print 'orange',ORANGE.getPosition(), ORANGE.color
+##        demoCube.setColor(RED.getPosition(), RED.color)
+##        demoCube.setColor(ORANGE.getPosition(), ORANGE.color)
+##        demoCube.setColor(BLUE.getPosition(), BLUE.color)
+##        demoCube.setColor(YELLOW.getPosition(), YELLOW.color)
+##        demoCube.setColor(WHITE.getPosition(), WHITE.color)
+##        demoCube.setColor(GREEN.getPosition(), GREEN.color)
+
+
+
+        centerColor.most9similarColors(config)
 
 if __name__ == '__main__':
     cubeFromCam()
