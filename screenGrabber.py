@@ -212,6 +212,7 @@ class DemoCube(object):
 
     def __init__(self):
         self.colors = ['gray'] * 54
+        self.grabbedColors = ['gray'] * 54
         (self.width, self.height) = (400, 500)
         self.dim = {'width': self.width, 'height': self.height}
         self.faceIndex = 0
@@ -313,7 +314,15 @@ class DemoCube(object):
         w = 20
         xoffset = 20
         yoffset = 20
-        for i in xrange(len(self.colors)):
+
+        # in waiting color phase, do not update grabbedcolor
+        # it helps to compare the grabbed colors to calculated ones
+        # does not work with self.grabbedColors = self.colors
+        if not self.waitingColor :
+            for i in xrange(len(self.colors)):
+                self.grabbedColors[i] = self.colors[i]
+        
+        for i in xrange(len(self.grabbedColors)):
             # 2 layers, each layer contains 27 blocks
             # inverse x, so use 3-i
             # gap 30 between each 2 9-block
@@ -326,7 +335,7 @@ class DemoCube(object):
             x1 = x0+w
             y0 = w*((i%9)/3)+self.height+yoffset+ygap
             y1 = y0+w
-            cv2.rectangle(np.asarray(vis),(x0,y0),(x1,y1),colorTuple(self.colors[i]),-1)
+            cv2.rectangle(np.asarray(vis),(x0,y0),(x1,y1),colorTuple(self.grabbedColors[i]),-1)
         ##### indicate the current face ##########
         x0 = xoffset + self.faceIndex%3 * (w*3+30)
         y0 = yoffset + self.height + self.faceIndex/3 * (w*3+30)
@@ -718,10 +727,11 @@ def timer(data):
                 data.stream.logTurn('right')
             
         if data.numLogged == 6:
-            
+
+            data.cube.waitingColor = True
             demoCube = data.cube
             doit(demoCube)
-            data.cube.waitingColor = True
+            
             
         if data.cube.waitingColor:
             data.cube.faceIndex = data.cube.faceIndex % 6
@@ -811,7 +821,10 @@ def doit(demoCube):
             for FACE in FACES:
                 for i,cell in enumerate(cells):
                     vec = cell[1]
-                    corr = centerColor.corrRgb( vec,FACE[0].realVector )
+                    if FACE[0]==RED or FACE[0]==ORANGE :
+                        corr = centerColor.corrHsv( vec,FACE[0].realVector )
+                    else:
+                        corr = centerColor.corrRgb( vec,FACE[0].realVector )
                     cells[i][2] = corr
                 cells.sort(key = lambda cell : cell[2], reverse=True)
                 i=0
